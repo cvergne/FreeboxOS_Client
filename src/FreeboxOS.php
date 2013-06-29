@@ -10,6 +10,14 @@
     RestAPIClient is based on the work of Travis Dent ( https://github.com/tcdent )
 */
 
+/**
+
+    TODO:
+    - Revoir le système d'auto-relog pour diminuer le nombre de requêtes (stockage en session ?)
+
+**/
+
+
 class FreeboxOS {
     public $options;
     private $api_full_base_url;
@@ -182,6 +190,19 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/');
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
+    public function downloads_Item($id)
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/' . intval($id));
         if ($request->info->http_code == 200 && $request->response->success) {
             return $request->response;
         }
