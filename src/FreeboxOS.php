@@ -28,7 +28,7 @@ class FreeboxOS {
     public $auth_status;
     private $challenge;
     private $password;
-    public $logged_in;
+    public $logged_in=false;
     private $session_token;
     public $permissions;
 
@@ -54,7 +54,7 @@ class FreeboxOS {
             'monitor_wait' => 5, // in seconds
             'rest' => array(
                 'headers' => array(
-                    'Content-Type: application/json'
+                    'Content-Type' => 'application/json'
                 )
             )
         ), $options);
@@ -96,7 +96,6 @@ class FreeboxOS {
         else if (!$request->response->success) {
             $this->error($request);
         }
-
 
         return $request;
     }
@@ -140,7 +139,9 @@ class FreeboxOS {
 
         if ($request->info->http_code == 200 && $request->response->success) {
             $this->logged_in = $request->response->result->logged_in;
-            $this->challenge = $request->response->result->challenge;
+            if (isset($request->response->result->challenge)) {
+                $this->challenge = $request->response->result->challenge;
+            }
 
             return true;
         }
@@ -175,8 +176,34 @@ class FreeboxOS {
         return false;
     }
 
+    /*==========  Downloads  ==========*/
+    public function downloads_List()
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/');
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
+
     /*==========  UTILITIES  ==========*/
-    public function check_api_version()
+    public function checkPermission($id=NULL)
+    {
+        if (!$this->logged_in) {
+            $this->login_Challenge();
+            $this->login_Session();
+        }
+        if ($id && !$this->permissions->{$id}) {
+            throw new Exception('Access denied for this app to ' . $id);
+        }
+    }
+
+    public function checkApiVersion()
     {
         $request = $this->API->request($this->options['freebox_ip'] . '/api_version', 'GET', array(), array(), false);
         if ($request->info->http_code == 200) {
@@ -231,7 +258,7 @@ class FreeboxOS {
     private function setSession()
     {
         if ($this->session_token) {
-            $session_auth_headers = 'X-Fbx-App-Auth: ' . $this->session_token;
+            $session_auth_headers = $this->session_token;
             $this->options['rest']['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
             $this->API->options['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
         }
@@ -239,6 +266,7 @@ class FreeboxOS {
 
     private function error($request, $addmessage='')
     {
+        var_dump($request);
         throw new Exception($addmessage . ' [' . $request->response->error_code . '] ' . $request->response->msg);
     }
 }
@@ -246,13 +274,12 @@ class FreeboxOS {
 class RestAPIClient
 {
     public $options;
-    public $handle; // cURL resource handle.
+    public $handle; // cURL ressource
 
-    // Populated after execution:
-    public $response; // Response body.
-    public $headers; // Parsed reponse header object.
-    public $info; // Response info object.
-    public $error; // Response error string.
+    public $response;
+    public $headers;
+    public $info;
+    public $error;
 
     public function __construct($options=array())
     {
