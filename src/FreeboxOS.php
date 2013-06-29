@@ -204,6 +204,46 @@ class FreeboxOS {
 
         $request = $this->API->get('downloads/' . intval($id));
         if ($request->info->http_code == 200 && $request->response->success) {
+            $request->response->result->download_dir = utf8_decode(base64_decode($request->response->result->download_dir));
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
+    public function downloads_Remove($id, $erase_files=false)
+    {
+        $this->checkPermission('downloader');
+
+        $path = 'downloads/' . intval($id);
+        if ($erase_files) {
+            $path .= '/erase';
+        }
+
+        $request = $this->API->delete($path);
+
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
+    public function downloads_Update($id, $data)
+    {
+        $this->checkPermission('downloader');
+
+        // TODO
+    }
+
+    public function downloads_Log($id)
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/' . intval($id) . '/log');
+        if ($request->info->http_code == 200 && $request->response->success) {
             return $request->response;
         }
         else if (!$request->response->success) {
