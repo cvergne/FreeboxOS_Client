@@ -19,14 +19,18 @@ class FreeboxOS {
 
     // Freebox API Vars
     private $uid;
-    private $device_name;
+    public $device_name;
     private $api_version='1.0';
     private $api_base_url='/api/';
-    private $device_type;
-    private $track_id;
+    public $device_type;
     private $app_token;
+    private $track_id;
+    public $auth_status;
     private $challenge;
     private $password;
+    public $logged_in;
+    private $session_token;
+    public $permissions;
 
     public function __construct($app=array(), $options=array())
     {
@@ -47,6 +51,7 @@ class FreeboxOS {
         $this->options = array_merge(array(
             'freebox_ip' => 'http://mafreebox.freebox.fr',
             'freebox_local' => 'http://mafreebox.freebox.fr',
+            'monitor_wait' => 5, // in seconds
             'rest' => array(
                 'headers' => array(
                     'Content-Type: application/json'
@@ -55,11 +60,11 @@ class FreeboxOS {
         ), $options);
 
         // Define Base URL
-        $this->define_base_urls();
+        $this->defineBaseUrls();
 
         // Define Token
-        if (isset($this->options->app_token)) {
-            $this->app_token = $this->options->app_token;
+        if (isset($this->options['app_token']) && !empty($this->options['app_token'])) {
+            $this->app_token = $this->options['app_token'];
         }
 
         // Init API Client
@@ -67,28 +72,107 @@ class FreeboxOS {
     }
 
     /*==========  Login  ==========*/
-    public function _autolog()
+    public function login_Autolog()
     {
-        /*
-            - Vérification que app_token est défini
-                - sinon ->authorize()
-                    - stockage de l'app_token et du track_id
-                    - monitoring du tracking jusqu'à accès != 'pending'
-                    - si 'granted':
-            - récupération du challenge [->login_()]
-            - génération du mot de passe et ouverture de session
-        */
+        if (!$this->app_token) {
+            $this->login_Authorize();
+            $this->login_Monitortrack();
+        }
 
+        $this->login_Challenge();
+        $this->login_Session();
     }
 
-    public function login_authorize()
+    public function login_Authorize()
     {
-        $this->switch_to_local(true);
+        $this->switchToLocal(true);
         $request = $this->API->post('login/authorize/', $this->app);
+        $this->switchToLocal(false);
 
-        $this->switch_to_local(false);
+        if ($request->info->http_code == 200 && $request->response->success) {
+            $this->app_token = $request->response->result->app_token;
+            $this->track_id = $request->response->result->track_id;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+
 
         return $request;
+    }
+
+    public function login_Monitortrack()
+    {
+        $this->login_Track();
+        if ($this->auth_status == 'pending') {
+            sleep($this->options['monitor_wait']);
+            $this->login_Monitortrack();
+        }
+    }
+
+    public function login_Track()
+    {
+        if ($this->track_id) {
+            $this->switchToLocal(true);
+            $request = $this->API->get('login/authorize/' . $this->track_id);
+            $this->switchToLocal(false);
+
+            if ($request->info->http_code == 200 && $request->response->success) {
+                $this->challenge = $request->response->result->challenge;
+                $this->auth_status = $request->response->result->status;
+                return $this->auth_status;
+            }
+            else if (!$request->response->success) {
+                $this->error($request);
+                return false;
+            }
+        }
+        else {
+            throw new Exception('Missing Track ID. Run authorize first or pass an app_token.');
+        }
+
+        return false;
+    }
+
+    public function login_Challenge()
+    {
+        $request = $this->API->get('login/');
+
+        if ($request->info->http_code == 200 && $request->response->success) {
+            $this->logged_in = $request->response->result->logged_in;
+            $this->challenge = $request->response->result->challenge;
+
+            return true;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+
+        return false;
+    }
+
+    public function login_Session()
+    {
+        $request = $this->API->post('login/session/', array(
+            'app_id' => $this->app['app_id'],
+            'password' => $this->setPassword()
+        ));
+        if ($request->info->http_code == 200 && $request->response->success) {
+            $this->session_token = $request->response->result->session_token;
+
+            $this->setSession();
+
+            if ($request->response->result->permissions) {
+                $this->permissions = $request->response->result->permissions;
+            }
+
+            return true;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+
+        return false;
     }
 
     /*==========  UTILITIES  ==========*/
@@ -102,7 +186,7 @@ class FreeboxOS {
             $this->api_base_url = $request->response->api_base_url;
             $this->device_type = $request->response->device_type;
 
-            $this->define_base_urls();
+            $this->defineBaseUrls();
 
             return true;
         }
@@ -111,7 +195,7 @@ class FreeboxOS {
         }
     }
 
-    private function define_base_urls()
+    private function defineBaseUrls()
     {
         $this->api_full_base_url = $this->api_base_url . 'v' . intval($this->api_version);
 
@@ -124,21 +208,38 @@ class FreeboxOS {
         }
     }
 
-    private function switch_to_local($state=false)
+    private function switchToLocal($state=false)
     {
         $this->API->options['switch_base_url'] = $state;
     }
 
-    private function password()
+    private function setPassword()
     {
+        if (!$this->challenge) {
+            $this->login_Challenge();
+        }
         if ($this->app_token && $this->challenge) {
             $this->password = hash_hmac('sha1', $this->challenge, $this->app_token);
             return $this->password;
         }
         else {
-            throw new Exception('Password gen error, missing app_token or challenge');
+            throw new Exception('Error Password set, missing app_token or challenge');
 
         }
+    }
+
+    private function setSession()
+    {
+        if ($this->session_token) {
+            $session_auth_headers = 'X-Fbx-App-Auth: ' . $this->session_token;
+            $this->options['rest']['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
+            $this->API->options['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
+        }
+    }
+
+    private function error($request, $addmessage='')
+    {
+        throw new Exception($addmessage . ' [' . $request->response->error_code . '] ' . $request->response->msg);
     }
 }
 
