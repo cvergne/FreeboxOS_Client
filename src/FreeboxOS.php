@@ -10,20 +10,14 @@
     RestAPIClient is based on the work of Travis Dent ( https://github.com/tcdent )
 */
 
-/**
-
-    TODO:
-    - Revoir le système d'auto-relog pour diminuer le nombre de requêtes (stockage en session ?)
-
-**/
-
-
 class FreeboxOS {
     public $options;
     private $api_full_base_url;
+    private $session_vars = array('uid', 'device_name', 'api_version', 'api_base_url', 'device_type', 'app_token', 'track_id', 'auth_status', 'challenge', 'password', 'session_token', 'permissions');
 
     // APP data
     public $app;
+    public $app_uid;
 
     // Freebox API Vars
     private $uid;
@@ -32,13 +26,14 @@ class FreeboxOS {
     private $api_base_url='/api/';
     public $device_type;
     private $app_token;
-    private $track_id;
+    public $track_id;
     public $auth_status;
     private $challenge;
     private $password;
-    public $logged_in=false;
     private $session_token;
     public $permissions;
+
+    public $logged_in=false;
 
     public function __construct($app=array(), $options=array())
     {
@@ -54,6 +49,7 @@ class FreeboxOS {
                 throw new Exception('the value of ' . $key . ' is missing');
             }
         }
+        $this->app_uid = sha1($this->app['app_id'].$this->app['app_name'].$this->app['app_version'].$this->app['device_name']);
 
         // Merge main options
         $this->options = array_merge(array(
@@ -77,6 +73,13 @@ class FreeboxOS {
 
         // Init API Client
         $this->API = new RestAPIClient($this->options['rest']);
+
+        // Define PHP Session
+        $this->getSessionVars()->setSessionVars();
+        if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
+            $this->session_token = $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'];
+            $this->setSession();
+        }
     }
 
     /*==========  Login  ==========*/
@@ -87,8 +90,10 @@ class FreeboxOS {
             $this->login_Monitortrack();
         }
 
-        $this->login_Challenge();
+        // $this->login_Challenge();
         $this->login_Session();
+
+        $this->setSessionVars();
     }
 
     public function login_Authorize()
@@ -99,6 +104,7 @@ class FreeboxOS {
 
         if ($request->info->http_code == 200 && $request->response->success) {
             $this->app_token = $request->response->result->app_token;
+            $_SESSION['FreeboxOSAPI'][$this->app_uid]['app_token'] = $this->app_token;
             $this->track_id = $request->response->result->track_id;
         }
         else if (!$request->response->success) {
@@ -144,44 +150,64 @@ class FreeboxOS {
     public function login_Challenge()
     {
         $request = $this->API->get('login/');
-
         if ($request->info->http_code == 200 && $request->response->success) {
             $this->logged_in = $request->response->result->logged_in;
             if (isset($request->response->result->challenge)) {
                 $this->challenge = $request->response->result->challenge;
             }
-
-            return true;
         }
         else if (!$request->response->success) {
             $this->error($request);
         }
 
-        return false;
+        return $request;
     }
 
     public function login_Session()
     {
-        $request = $this->API->post('login/session/', array(
-            'app_id' => $this->app['app_id'],
-            'password' => $this->setPassword()
-        ));
-        if ($request->info->http_code == 200 && $request->response->success) {
-            $this->session_token = $request->response->result->session_token;
+        if (!$this->logged_in && !$this->challenge) {
+            $this->login_Challenge();
+        }
+        if (!$this->logged_in) {
+            if ($this->app_token && $this->challenge) {
+                $this->password = hash_hmac('sha1', $this->challenge, $this->app_token);
+            }
+            else {
+                throw new Exception('Error Password set, missing app_token or challenge');
+            }
+            $request = $this->API->post('login/session/', array(
+                'app_id' => $this->app['app_id'],
+                'password' => $this->password
+            ));
+            if ($request->info->http_code == 200 && $request->response->success) {
+                $this->session_token = $request->response->result->session_token;
+                $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'] = $this->session_token;
 
-            $this->setSession();
+                $this->setSession();
 
-            if ($request->response->result->permissions) {
-                $this->permissions = $request->response->result->permissions;
+                if ($request->response->result->permissions) {
+                    $this->permissions = $request->response->result->permissions;
+                }
+
+                $this->logged_in = true;
+
+                return true;
+            }
+            else if (!$request->response->success) {
+                // Perform auto re-log if challenge has expired
+                if (in_array($request->response->error_code, array('invalid_token', 'pending_token'))) {
+                    $this->setChallenge($request);
+                    $this->login_Session();
+                }
+                else {
+                    $this->error($request);
+                }
             }
 
-            return true;
-        }
-        else if (!$request->response->success) {
-            $this->error($request);
+            return false;
         }
 
-        return false;
+        return true;
     }
 
     /*==========  Downloads  ==========*/
@@ -256,7 +282,6 @@ class FreeboxOS {
     public function checkPermission($id=NULL)
     {
         if (!$this->logged_in) {
-            $this->login_Challenge();
             $this->login_Session();
         }
         if ($id && !$this->permissions->{$id}) {
@@ -301,18 +326,10 @@ class FreeboxOS {
         $this->API->options['switch_base_url'] = $state;
     }
 
-    private function setPassword()
+    private function setChallenge($request)
     {
-        if (!$this->challenge) {
-            $this->login_Challenge();
-        }
-        if ($this->app_token && $this->challenge) {
-            $this->password = hash_hmac('sha1', $this->challenge, $this->app_token);
-            return $this->password;
-        }
-        else {
-            throw new Exception('Error Password set, missing app_token or challenge');
-
+        if (isset($request->response->result->challenge)) {
+            $this->challenge = $request->response->result->challenge;
         }
     }
 
@@ -323,6 +340,39 @@ class FreeboxOS {
             $this->options['rest']['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
             $this->API->options['headers']['X-Fbx-App-Auth'] = $session_auth_headers;
         }
+    }
+
+    private function setSessionVars()
+    {
+        if ($this->app_uid) {
+            if (!isset($_SESSION['FreeboxOSAPI'])) {
+                $_SESSION['FreeboxOSAPI'] = array();
+            }
+            if (!isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
+                $_SESSION['FreeboxOSAPI'][$this->app_uid] = array();
+            }
+
+            foreach ($this->session_vars as $v) {
+                if (!empty($this->{$v})) {
+                    $_SESSION['FreeboxOSAPI'][$this->app_uid][$v] = $this->{$v};
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    private function getSessionVars()
+    {
+        if ($this->app_uid && isset($_SESSION['FreeboxOSAPI']) && isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
+            foreach ($this->session_vars as $v) {
+                if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid][$v]) && !empty($_SESSION['FreeboxOSAPI'][$this->app_uid][$v])) {
+                    $this->{$v} = $_SESSION['FreeboxOSAPI'][$this->app_uid][$v];
+                }
+            }
+        }
+
+        return $this;
     }
 
     private function error($request, $addmessage='')
@@ -406,6 +456,7 @@ class RestAPIClient
 
     public function request($url, $method='GET', $parameters=array(), $headers=array(), $use_base_url=true)
     {
+        var_dump($url);
         $client = clone $this;
 
         $client->url = $url;
