@@ -26,7 +26,7 @@ class FreeboxOS {
     private $api_base_url='/api/';
     public $device_type;
     private $app_token;
-    public $track_id;
+    private $track_id;
     public $auth_status;
     private $challenge;
     private $password;
@@ -78,7 +78,7 @@ class FreeboxOS {
         $this->getSessionVars()->setSessionVars();
         if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
             $this->session_token = $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'];
-            $this->setSession();
+            $this->logged_in = true;
         }
     }
 
@@ -90,8 +90,9 @@ class FreeboxOS {
             $this->login_Monitortrack();
         }
 
-        // $this->login_Challenge();
-        $this->login_Session();
+        if (!$this->session_token) {
+            $this->login_Session();
+        }
 
         $this->setSessionVars();
     }
@@ -282,7 +283,11 @@ class FreeboxOS {
     public function checkPermission($id=NULL)
     {
         if (!$this->logged_in) {
-            $this->login_Session();
+            $this->login_Challenge();
+            if (!$this->logged_in) {
+                $this->login_Session();
+            }
+            $this->setSessionVars();
         }
         if ($id && !$this->permissions->{$id}) {
             throw new Exception('Access denied for this app to ' . $id);
@@ -377,7 +382,6 @@ class FreeboxOS {
 
     private function error($request, $addmessage='')
     {
-        var_dump($request);
         throw new Exception($addmessage . ' [' . $request->response->error_code . '] ' . $request->response->msg);
     }
 }
@@ -456,7 +460,6 @@ class RestAPIClient
 
     public function request($url, $method='GET', $parameters=array(), $headers=array(), $use_base_url=true)
     {
-        var_dump($url);
         $client = clone $this;
 
         $client->url = $url;
