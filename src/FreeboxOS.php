@@ -285,10 +285,37 @@ class FreeboxOS {
         }
     }
 
+    public function downloads_Stats()
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/stats/');
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
+    public function downloads_FilesList($id)
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/' . intval($id) . '/files');
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+        }
+    }
+
 
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
     {
+        // Auto re-connect if not logged
         if (!$this->logged_in) {
             $this->login_Challenge();
             if (!$this->logged_in) {
@@ -296,6 +323,7 @@ class FreeboxOS {
             }
             $this->setSessionVars();
         }
+
         if ($id && !$this->permissions->{$id}) {
             throw new Exception('Access denied for this app to ' . $id);
         }
