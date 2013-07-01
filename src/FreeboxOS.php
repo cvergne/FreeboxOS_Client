@@ -76,10 +76,9 @@ class FreeboxOS {
 
         // Define PHP Session
         $this->getSessionVars()->setSessionVars();
-        if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
-            $this->session_token = $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'];
-            $this->logged_in = true;
-        }
+
+        // Autolog
+        $this->login_Autolog();
     }
 
     /*==========  Login  ==========*/
@@ -90,7 +89,13 @@ class FreeboxOS {
             $this->login_Monitortrack();
         }
 
-        if (!$this->session_token) {
+        if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
+            $this->session_token = $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'];
+            $this->setSession();
+        }
+        $this->login_Challenge();
+
+        if (!$this->logged_in && !$this->session_token) {
             $this->login_Session();
         }
 
@@ -518,6 +523,9 @@ class RestAPIClient
         $client->error = curl_error($client->handle);
 
         curl_close($client->handle);
+        var_dump($url);
+        var_dump($client->response->result);
+
         return $client;
     }
 }
