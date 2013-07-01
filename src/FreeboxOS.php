@@ -96,10 +96,12 @@ class FreeboxOS {
         $this->login_Challenge();
 
         if (!$this->logged_in && !$this->session_token) {
-            $this->login_Session();
+            $this->login_Session(true);
         }
 
         $this->setSessionVars();
+
+        return $this;
     }
 
     public function login_Authorize()
@@ -169,9 +171,9 @@ class FreeboxOS {
         return $request;
     }
 
-    public function login_Session()
+    public function login_Session($skip_challenge=false)
     {
-        if (!$this->logged_in && !$this->challenge) {
+        if (!$skip_challenge && !$this->logged_in && !$this->challenge) {
             $this->login_Challenge();
         }
         if (!$this->logged_in) {
@@ -523,8 +525,6 @@ class RestAPIClient
         $client->error = curl_error($client->handle);
 
         curl_close($client->handle);
-        var_dump($url);
-        var_dump($client->response->result);
 
         return $client;
     }
