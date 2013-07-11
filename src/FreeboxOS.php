@@ -256,20 +256,20 @@ class FreeboxOS {
         }
 
         $request = $this->API->delete($path);
-
-        if ($request->info->http_code == 200 && $request->response->success) {
-            return $request->response;
-        }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+        return $this->finalize_request($request);
     }
 
     public function downloads_Update($id, $data)
     {
         $this->checkPermission('downloader');
 
-        // TODO
+        if (is_array($data)) {
+            $request = $this->API->put('downloads/' . intval($id), $data);
+            return $this->finalize_request($request);
+        }
+        else {
+            $this->error($data, 'Data passed must be an array');
+        }
     }
 
     public function downloads_Log($id)
@@ -277,12 +277,34 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/' . intval($id) . '/log');
-        if ($request->info->http_code == 200 && $request->response->success) {
-            return $request->response;
+        return $this->finalize_request($request);
+    }
+
+    public function downloads_addURL($data, $use_raw=false)
+    {
+        if (!$use_raw)
+        {
+            if (isset($data['download_url'])) {
+                $data['download_url'] = urlencode($data['download_url']);
+            }
+            else if (isset($data['download_url_list']) && is_array($data['download_url_list'])) {
+                $data['download_url_list'] = urlencode(implode("\n", $data['download_url_list']));
+            }
+
+            if (isset($data['recursive'])) {
+                $data['recursive'] = boolval($data['recursive']);
+            }
         }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+
+        $request = $this->API->post('downloads/add', $data, array(
+            'Content-Type' => 'application/x-www-form-urlencoded'
+        ));
+
+        /*
+            NON FONCTIONNEL
+        */
+
+        return $this->finalize_request($request);
     }
 
     public function downloads_Stats()
@@ -290,12 +312,7 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/stats/');
-        if ($request->info->http_code == 200 && $request->response->success) {
-            return $request->response;
-        }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+        return $this->finalize_request($request);
     }
 
     public function downloads_FilesList($id)
@@ -303,12 +320,31 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/' . intval($id) . '/files');
-        if ($request->info->http_code == 200 && $request->response->success) {
-            return $request->response;
-        }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+        return $this->finalize_request($request);
+    }
+
+    public function downloads_getConfiguration()
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->get('downloads/config/');
+        return $this->finalize_request($request);
+    }
+
+    public function downloads_updateConfiguration($config)
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->put('downloads/config/', $config);
+        return $this->finalize_request($request);
+    }
+
+    public function downloads_updateThrottling($config)
+    {
+        $this->checkPermission('downloader');
+
+        $request = $this->API->put('downloads/throttling/', $config);
+        return $this->finalize_request($request);
     }
 
 
@@ -415,8 +451,20 @@ class FreeboxOS {
         return $this;
     }
 
+    private function finalize_request($request)
+    {
+        if ($request->info->http_code == 200 && $request->response->success) {
+            return $request->response;
+        }
+        else if (!$request->response->success) {
+            $this->error($request);
+            return false;
+        }
+    }
+
     private function error($request, $addmessage='')
     {
+        var_dump($request);
         throw new Exception($addmessage . ' [' . $request->response->error_code . '] ' . $request->response->msg);
     }
 }
