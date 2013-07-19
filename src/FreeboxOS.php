@@ -282,13 +282,17 @@ class FreeboxOS {
 
     public function downloads_addURL($data, $use_raw=false)
     {
+        $this->checkPermission('downloader');
+
         if (!$use_raw)
         {
-            if (isset($data['download_url'])) {
-                $data['download_url'] = urlencode($data['download_url']);
+            if (isset($data['download_url']) && is_array($data['download_url'])) {
+                $data['download_url_list'] = $data['download_url'];
+                unset($data['download_url']);
             }
-            else if (isset($data['download_url_list']) && is_array($data['download_url_list'])) {
-                $data['download_url_list'] = urlencode(implode("\n", $data['download_url_list']));
+
+            if (isset($data['download_url_list']) && is_array($data['download_url_list'])) {
+                $data['download_url_list'] = implode("\n", $data['download_url_list']);
             }
 
             if (isset($data['recursive'])) {
@@ -298,6 +302,8 @@ class FreeboxOS {
 
         $request = $this->API->post('downloads/add', $data, array(
             'Content-Type' => 'application/x-www-form-urlencoded'
+        ), array(
+            CURLOPT_POST => TRUE
         ));
 
         /*
@@ -493,26 +499,26 @@ class RestAPIClient
         ), $options);
     }
 
-    public function get($url, $parameters=array(), $headers=array())
+    public function get($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
-        return $this->request($url, 'GET', $parameters, $headers);
+        return $this->request($url, 'GET', $parameters, $headers, $curl_opt);
     }
 
-    public function post($url, $parameters=array(), $headers=array())
+    public function post($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
-        return $this->request($url, 'POST', $parameters, $headers);
+        return $this->request($url, 'POST', $parameters, $headers, $curl_opt);
     }
 
-    public function put($url, $parameters=array(), $headers=array())
+    public function put($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
         $parameters['_method'] = "PUT";
-        return $this->post($url, $parameters, $headers);
+        return $this->post($url, $parameters, $headers, $curl_opt);
     }
 
-    public function delete($url, $parameters=array(), $headers=array())
+    public function delete($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
         $parameters['_method'] = "DELETE";
-        return $this->post($url, $parameters, $headers);
+        return $this->post($url, $parameters, $headers, $curl_opt);
     }
 
     public function parse_response($response)
@@ -541,7 +547,7 @@ class RestAPIClient
         $this->response = json_decode(strtok(""));
     }
 
-    public function request($url, $method='GET', $parameters=array(), $headers=array(), $use_base_url=true)
+    public function request($url, $method='GET', $parameters=array(), $headers=array(), $curl_opt=array(), $use_base_url=true)
     {
         $client = clone $this;
 
@@ -567,7 +573,14 @@ class RestAPIClient
 
         // Format query
         if (count($parameters)) {
-            $curl_options[CURLOPT_POSTFIELDS] = json_encode($parameters);
+            // Build query parameters as classic form instead of JSON if CURL POST is set to true
+            if ((count($curl_opt) && isset($curl_opt[CURLOPT_POST]) && $curl_opt[CURLOPT_POST] === true)
+                || (count($curl_options) && isset($curl_options[CURLOPT_POST]) && $curl_options[CURLOPT_POST] === true)) {
+                $curl_options[CURLOPT_POSTFIELDS] = http_build_query($parameters);
+            }
+            else {
+                $curl_options[CURLOPT_POSTFIELDS] = json_encode($parameters);
+            }
         }
 
         // Define Base URL
@@ -590,6 +603,11 @@ class RestAPIClient
         if($client->options['curl_options']){
             // array_merge would reset our numeric keys.
             foreach($client->options['curl_options'] as $key => $value){
+                $curl_options[$key] = $value;
+            }
+        }
+        if(count($curl_opt)) {
+            foreach($curl_opt as $key => $value){
                 $curl_options[$key] = $value;
             }
         }
