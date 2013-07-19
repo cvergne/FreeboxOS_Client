@@ -511,13 +511,13 @@ class RestAPIClient
 
     public function put($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
-        $parameters['_method'] = "PUT";
+        $curl_opt[CURLOPT_CUSTOMREQUEST] = "PUT";
         return $this->post($url, $parameters, $headers, $curl_opt);
     }
 
     public function delete($url, $parameters=array(), $headers=array(), $curl_opt=array())
     {
-        $parameters['_method'] = "DELETE";
+        $curl_opt[CURLOPT_CUSTOMREQUEST] = "DELETE";
         return $this->post($url, $parameters, $headers, $curl_opt);
     }
 
