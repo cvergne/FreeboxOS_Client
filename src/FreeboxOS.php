@@ -306,9 +306,25 @@ class FreeboxOS {
             CURLOPT_POST => TRUE
         ));
 
-        /*
-            NON FONCTIONNEL
-        */
+        return $this->finalize_request($request);
+    }
+
+    public function downloads_addFile($data, $use_raw=false)
+    {
+        $this->checkPermission('downloader');
+
+        if (!$use_raw)
+        {
+            if (isset($data['download_file']) && strpos($data['download_file'], '@') !== 0) {
+                $data['download_file'] = '@' . realpath($data['download_file']);
+            }
+        }
+
+        $request = $this->API->post('downloads/add', $data, array(
+            'Content-Type' => null // avoid overwrite of auto content-type "multipart/form-data" by "application/json"
+        ), array(
+            CURLOPT_POST => TRUE // auto content-type and manage file transfer
+        ));
 
         return $this->finalize_request($request);
     }
@@ -521,10 +537,14 @@ class RestAPIClient
         return $this->post($url, $parameters, $headers, $curl_opt);
     }
 
-    public function parse_response($response)
+    public function parse_response($response, $header_size=0)
     {
         $headers = array();
-        $http_ver = strtok($response, "\n");
+        if ($header_size > 0) {
+            $head = substr($response, 0, $header_size);
+            $body = substr($response, $header_size);
+        }
+        $http_ver = strtok($head, "\n");
 
         while($line = strtok("\n")){
             if(strlen(trim($line)) == 0) break;
@@ -542,9 +562,8 @@ class RestAPIClient
                 $headers[$key] = array($headers[$key], $value);
             }
         }
-
         $this->headers = (object) $headers;
-        $this->response = json_decode(strtok(""));
+        $this->response = json_decode($body);
     }
 
     public function request($url, $method='GET', $parameters=array(), $headers=array(), $curl_opt=array(), $use_base_url=true)
@@ -567,16 +586,23 @@ class RestAPIClient
             $headers = array_merge($client->options['headers'], $headers);
 
             foreach ($headers as $key => $value) {
-                $curl_options[CURLOPT_HTTPHEADER][] = sprintf("%s:%s", $key, $value);
+                if (!empty($value)) {
+                    $curl_options[CURLOPT_HTTPHEADER][] = sprintf("%s:%s", $key, $value);
+                }
             }
         }
 
+        if(count($curl_opt)) {
+            foreach($curl_opt as $key => $value){
+                $curl_options[$key] = $value;
+            }
+        }
         // Format query
         if (count($parameters)) {
             // Build query parameters as classic form instead of JSON if CURL POST is set to true
             if ((count($curl_opt) && isset($curl_opt[CURLOPT_POST]) && $curl_opt[CURLOPT_POST] === true)
                 || (count($curl_options) && isset($curl_options[CURLOPT_POST]) && $curl_options[CURLOPT_POST] === true)) {
-                $curl_options[CURLOPT_POSTFIELDS] = http_build_query($parameters);
+                $curl_options[CURLOPT_POSTFIELDS] = $parameters;
             }
             else {
                 $curl_options[CURLOPT_POSTFIELDS] = json_encode($parameters);
@@ -606,15 +632,11 @@ class RestAPIClient
                 $curl_options[$key] = $value;
             }
         }
-        if(count($curl_opt)) {
-            foreach($curl_opt as $key => $value){
-                $curl_options[$key] = $value;
-            }
-        }
         curl_setopt_array($client->handle, $curl_options);
 
         // Exec and parse request
-        $client->parse_response(curl_exec($client->handle));
+        $curl_exec = curl_exec($client->handle);
+        $client->parse_response($curl_exec, curl_getinfo($client->handle, CURLINFO_HEADER_SIZE));
         $client->info = (object) curl_getinfo($client->handle);
         $client->error = curl_error($client->handle);
 
