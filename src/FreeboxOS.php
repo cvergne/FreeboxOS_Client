@@ -60,6 +60,9 @@ class FreeboxOS {
                 'headers' => array(
                     'Content-Type' => 'application/json'
                 )
+            ),
+            'fs' => array(
+                'conflict_mode' => 'both'
             )
         ), $options);
 
@@ -369,6 +372,79 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    /*==========  FILE SYSTEM  ==========*/
+    public function fs_listEveryTasks()
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('fs/tasks/');
+        return $this->finalize_request($request);
+    }
+
+    public function fs_listTask($id)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('fs/tasks/' . intval($id));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_deleteTask($id)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->detele('fs/tasks/' . intval($id));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_updateTask($id, $parameters=array())
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->put('fs/tasks/' . intval($id), $parameters);
+        return $this->finalize_request($request);
+    }
+
+    public function fs_listFiles($path, $parameters=array('removeHidden' => true))
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('fs/ls/' . $path . '?' . http_build_query($parameters));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_fileInfo($path)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('fs/info/' . $path);
+        return $this->finalize_request($request);
+    }
+
+    public function fs_fileMove($parameters)
+    {
+        $this->checkPermission('explorer');
+
+        if (!isset($parameters['mode'])) {
+            $parameters['mode'] = $this->options['fs']['conflict_mode'];
+        }
+
+        $request = $this->API->post('fs/mv/', $parameters);
+        return $this->finalize_request($request);
+    }
+
+    public function fs_copyFile($parameters)
+    {
+        $this->checkPermission('explorer');
+
+        if (!isset($parameters['mode'])) {
+            $parameters['mode'] = $this->options['fs']['conflict_mode'];
+        }
+
+        $request = $this->API->post('fs/cp/', $parameters);
+        return $this->finalize_request($request);
+    }
+
 
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
@@ -638,6 +714,7 @@ class RestAPIClient
             }
         }
         curl_setopt_array($client->handle, $curl_options);
+        // var_dump($curl_options);
 
         // Exec and parse request
         $curl_exec = curl_exec($client->handle);
