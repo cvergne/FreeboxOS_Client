@@ -490,6 +490,51 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    public function fs_extractArchive($parameters)
+    {
+        $this->checkPermission('explorer');
+
+        if (!isset($parameters['src'], $parameters['dst'])) {
+            $fileinfo = $this->fs_fileInfo($parameters['src']);
+            if ($fileinfo->success) {
+                $parameters['dst'] = $fileinfo->result->parent;
+            }
+        }
+
+        $request = $this->API->post('fs/extract/', $parameters);
+        return $this->finalize_request($request);
+    }
+
+    public function fs_repairFile($file, $delete_archive=false)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/repair/', array(
+            'src' => $file,
+            'delete_archive' => boolval($delete_archive)
+        ));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_hashFile($file, $hash_type='md5')
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/hash/', array(
+            'src' => $file,
+            'hash_type' => $hash_type
+        ));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_getHashValue($id)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('fs/tasks/' . intval($id) . '/hash');
+        return $this->finalize_request($request);
+    }
+
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
     {
