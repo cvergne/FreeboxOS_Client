@@ -602,7 +602,12 @@ class RestAPIClient
             // Build query parameters as classic form instead of JSON if CURL POST is set to true
             if ((count($curl_opt) && isset($curl_opt[CURLOPT_POST]) && $curl_opt[CURLOPT_POST] === true)
                 || (count($curl_options) && isset($curl_options[CURLOPT_POST]) && $curl_options[CURLOPT_POST] === true)) {
-                $curl_options[CURLOPT_POSTFIELDS] = $parameters;
+                if (isset($headers['Content-Type']) && $headers['Content-Type'] == 'application/x-www-form-urlencoded') {
+                    $curl_options[CURLOPT_POSTFIELDS] = http_build_query($parameters);
+                }
+                else {
+                    $curl_options[CURLOPT_POSTFIELDS] = $parameters;
+                }
             }
             else {
                 $curl_options[CURLOPT_POSTFIELDS] = json_encode($parameters);
