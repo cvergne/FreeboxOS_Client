@@ -10,7 +10,7 @@ Currently, the helper handles :
 - Download's methods ( *except Download Trackers & Download Peers, because they are unstable* )
 - FileSystem's methods ( *except downloading file* )
 
-Currently, you can check issue #20 to have the list of handled methods.
+Currently, you can check [issue #1](https://github.com/cvergne/FreeboxOS_Client/issues/1) to have the list of handled methods.
 
 -----------
 The MIT License (MIT)
