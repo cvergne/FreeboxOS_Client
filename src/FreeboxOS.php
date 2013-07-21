@@ -389,11 +389,28 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    public function fs_removeDoneTasks($state_to_remove=array('done'))
+    {
+        $tasks = $this->fs_listEveryTasks();
+        $return = array();
+
+        if ($tasks->success && count($tasks->result)) {
+            foreach($tasks->result as $task) {
+                if (in_array($task->state, $state_to_remove)) {
+                    $request = $this->fs_deleteTask($task->id);
+                    $return[$task->id] = $request->success;
+                }
+            }
+        }
+
+        return $return;
+    }
+
     public function fs_deleteTask($id)
     {
         $this->checkPermission('explorer');
 
-        $request = $this->API->detele('fs/tasks/' . intval($id));
+        $request = $this->API->delete('fs/tasks/' . intval($id));
         return $this->finalize_request($request);
     }
 
@@ -445,6 +462,33 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    public function fs_removeFile($files)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/rm/', array('files' => $files));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_catFiles($parameters)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/cat/', $parameters);
+        return $this->finalize_request($request);
+    }
+
+    public function fs_createArchive($parameters)
+    {
+        $this->checkPermission('explorer');
+
+        if (!isset($parameters['dst'])) {
+            $parameters['dst'] = 'L0Rpc3F1ZSBkdXI=';
+        }
+
+        $request = $this->API->post('fs/archive/', $parameters);
+        return $this->finalize_request($request);
+    }
 
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
