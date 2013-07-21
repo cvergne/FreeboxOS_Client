@@ -535,6 +535,38 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    public function fs_createDirectory($parent, $name)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/mkdir/', array(
+            'parent' => $parent,
+            'dirname' => $name
+        ));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_renameItem($src, $dst)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->post('fs/rename/', array(
+            'src' => $src,
+            'dst' => $dst
+        ));
+        return $this->finalize_request($request);
+    }
+
+    public function fs_downloadFile($path)
+    {
+        $this->checkPermission('explorer');
+
+        // $request = $this->API->get('dl/' . $path);
+        // return $this->finalize_request($request);
+
+        return false; // Not working
+    }
+
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
     {
