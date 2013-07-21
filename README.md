@@ -3,8 +3,14 @@ Freebox OS API PHP Client
 
 A PHP Client to use the Freebox OS API
 
+**It's a DRAFT, use it at your own risk**
 
-**It's a DRAFT, don't use it**
+Currently, the helper handles :
+- Auth methods
+- Download's methods ( *except Download Trackers & Download Peers, because they are unstable* )
+- FileSystem's methods ( *except downloading file* )
+
+Currently, you can check issue #20 to have the list of handled methods.
 
 -----------
 The MIT License (MIT)
