@@ -227,7 +227,7 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/');
-        $this->finalize_request($request);
+        return $this->finalize_request($request);
     }
 
     public function downloads_Item($id)
@@ -238,7 +238,7 @@ class FreeboxOS {
         if ($request->info->http_code == 200 && $request->response->success) {
             $request->response->result->download_dir_name = utf8_decode(base64_decode($request->response->result->download_dir));
         }
-        $this->finalize_request($request);
+        return $this->finalize_request($request);
     }
 
     public function downloads_Remove($id, $erase_files=false)
