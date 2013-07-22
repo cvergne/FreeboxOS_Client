@@ -227,12 +227,7 @@ class FreeboxOS {
         $this->checkPermission('downloader');
 
         $request = $this->API->get('downloads/');
-        if ($request->info->http_code == 200 && $request->response->success) {
-            return $request->response;
-        }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+        $this->finalize_request($request);
     }
 
     public function downloads_Item($id)
@@ -241,12 +236,9 @@ class FreeboxOS {
 
         $request = $this->API->get('downloads/' . intval($id));
         if ($request->info->http_code == 200 && $request->response->success) {
-            $request->response->result->download_dir = utf8_decode(base64_decode($request->response->result->download_dir));
-            return $request->response;
+            $request->response->result->download_dir_name = utf8_decode(base64_decode($request->response->result->download_dir));
         }
-        else if (!$request->response->success) {
-            $this->error($request);
-        }
+        $this->finalize_request($request);
     }
 
     public function downloads_Remove($id, $erase_files=false)
@@ -561,8 +553,8 @@ class FreeboxOS {
     {
         $this->checkPermission('explorer');
 
-        // $request = $this->API->get('dl/' . $path);
-        // return $this->finalize_request($request);
+        $request = $this->API->get('dl/' . $path, array(), array('_download' => true));
+        return $this->finalize_request($request);
 
         return false; // Not working
     }
@@ -766,6 +758,11 @@ class RestAPIClient
     public function request($url, $method='GET', $parameters=array(), $headers=array(), $curl_opt=array(), $use_base_url=true)
     {
         $client = clone $this;
+        $_download = false;
+        if (isset($headers['_download'])) {
+            $_download = true;
+            unset($headers['_download']);
+        }
 
         $client->url = $url;
         $client->handle = curl_init();
@@ -839,9 +836,14 @@ class RestAPIClient
 
         // Exec and parse request
         $curl_exec = curl_exec($client->handle);
-        $client->parse_response($curl_exec, curl_getinfo($client->handle, CURLINFO_HEADER_SIZE));
-        $client->info = (object) curl_getinfo($client->handle);
-        $client->error = curl_error($client->handle);
+        if ($_download) {
+            // Download
+        }
+        else {
+            $client->parse_response($curl_exec, curl_getinfo($client->handle, CURLINFO_HEADER_SIZE));
+            $client->info = (object) curl_getinfo($client->handle);
+            $client->error = curl_error($client->handle);
+        }
 
         curl_close($client->handle);
 
