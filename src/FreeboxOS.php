@@ -559,6 +559,39 @@ class FreeboxOS {
         return false; // Not working
     }
 
+    /*==========  STORAGE  ==========*/
+    public function storage_diskList()
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('storage/disk/');
+        return $this->finalize_request($request);
+    }
+
+    public function storage_diskInfo($id)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('storage/disk/' . intval($id));
+        return $this->finalize_request($request);
+    }
+
+    public function storage_partitionList()
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('storage/partition/');
+        return $this->finalize_request($request);
+    }
+
+    public function storage_partitionInfo($id)
+    {
+        $this->checkPermission('explorer');
+
+        $request = $this->API->get('storage/partition/' . intval($id));
+        return $this->finalize_request($request);
+    }
+
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
     {
