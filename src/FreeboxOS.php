@@ -592,6 +592,16 @@ class FreeboxOS {
         return $this->finalize_request($request);
     }
 
+    /*==========  CALLS/CONTACTS  ==========*/
+    public function call_logList()
+    {
+        $this->checkPermission('calls');
+
+        $request = $this->API->get('call/log/');
+        return $this->finalize_request($request);
+    }
+
+
     /*==========  UTILITIES  ==========*/
     public function checkPermission($id=NULL)
     {
