@@ -221,6 +221,11 @@ class FreeboxOS {
         return true;
     }
 
+    public function getAppToken()
+    {
+        return $this->app_token;
+    }
+
     /*==========  Downloads  ==========*/
     public function downloads_List()
     {
