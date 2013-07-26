@@ -53,6 +53,7 @@ class FreeboxOS {
 
         // Merge main options
         $this->options = array_merge(array(
+            'use_session' => true,
             'freebox_ip' => 'http://mafreebox.freebox.fr',
             'freebox_local' => 'http://mafreebox.freebox.fr',
             'monitor_wait' => 5, // in seconds
@@ -65,6 +66,9 @@ class FreeboxOS {
                 'conflict_mode' => 'both'
             )
         ), $options);
+
+        // Check PHP Session to autostart (if enabled)
+        $this->checkPHPSession(true);
 
         // Define Base URL
         $this->defineBaseUrls();
@@ -92,7 +96,7 @@ class FreeboxOS {
             $this->login_Monitortrack();
         }
 
-        if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
+        if ($this->checkPHPSession() && isset($_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'])) {
             $this->session_token = $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'];
             $this->setSession();
         }
@@ -115,7 +119,9 @@ class FreeboxOS {
 
         if ($request->info->http_code == 200 && $request->response->success) {
             $this->app_token = $request->response->result->app_token;
-            $_SESSION['FreeboxOSAPI'][$this->app_uid]['app_token'] = $this->app_token;
+            if ($this->checkPHPSession()) {
+                $_SESSION['FreeboxOSAPI'][$this->app_uid]['app_token'] = $this->app_token;
+            }
             $this->track_id = $request->response->result->track_id;
         }
         else if (!$request->response->success) {
@@ -192,7 +198,9 @@ class FreeboxOS {
             ));
             if ($request->info->http_code == 200 && $request->response->success) {
                 $this->session_token = $request->response->result->session_token;
-                $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'] = $this->session_token;
+                if ($this->checkPHPSession()) {
+                    $_SESSION['FreeboxOSAPI'][$this->app_uid]['session_token'] = $this->session_token;
+                }
 
                 $this->setSession();
 
@@ -608,6 +616,19 @@ class FreeboxOS {
 
 
     /*==========  UTILITIES  ==========*/
+    public function checkPHPSession($autostart=false)
+    {
+        if ($autostart && $this->options['use_session'] && ((function_exists('session_status') && session_status() == PHP_SESSION_NONE) || session_id() != '')) {
+            @session_start();
+            return true;
+        }
+        else {
+            return ($this->options['use_session'] && ((function_exists('session_status') && session_status() == PHP_SESSION_ACTIVE) || session_id() != ''));
+        }
+
+        return false;
+    }
+
     public function checkPermission($id=NULL)
     {
         // Auto re-connect if not logged
@@ -679,17 +700,19 @@ class FreeboxOS {
 
     private function setSessionVars()
     {
-        if ($this->app_uid) {
-            if (!isset($_SESSION['FreeboxOSAPI'])) {
-                $_SESSION['FreeboxOSAPI'] = array();
-            }
-            if (!isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
-                $_SESSION['FreeboxOSAPI'][$this->app_uid] = array();
-            }
+        if ($this->checkPHPSession()) {
+            if ($this->app_uid) {
+                if (!isset($_SESSION['FreeboxOSAPI'])) {
+                    $_SESSION['FreeboxOSAPI'] = array();
+                }
+                if (!isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
+                    $_SESSION['FreeboxOSAPI'][$this->app_uid] = array();
+                }
 
-            foreach ($this->session_vars as $v) {
-                if (!empty($this->{$v})) {
-                    $_SESSION['FreeboxOSAPI'][$this->app_uid][$v] = $this->{$v};
+                foreach ($this->session_vars as $v) {
+                    if (!empty($this->{$v})) {
+                        $_SESSION['FreeboxOSAPI'][$this->app_uid][$v] = $this->{$v};
+                    }
                 }
             }
         }
@@ -699,10 +722,12 @@ class FreeboxOS {
 
     private function getSessionVars()
     {
-        if ($this->app_uid && isset($_SESSION['FreeboxOSAPI']) && isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
-            foreach ($this->session_vars as $v) {
-                if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid][$v]) && !empty($_SESSION['FreeboxOSAPI'][$this->app_uid][$v])) {
-                    $this->{$v} = $_SESSION['FreeboxOSAPI'][$this->app_uid][$v];
+        if ($this->checkPHPSession()) {
+            if ($this->app_uid && isset($_SESSION['FreeboxOSAPI']) && isset($_SESSION['FreeboxOSAPI'][$this->app_uid])) {
+                foreach ($this->session_vars as $v) {
+                    if (isset($_SESSION['FreeboxOSAPI'][$this->app_uid][$v]) && !empty($_SESSION['FreeboxOSAPI'][$this->app_uid][$v])) {
+                        $this->{$v} = $_SESSION['FreeboxOSAPI'][$this->app_uid][$v];
+                    }
                 }
             }
         }
