@@ -36,7 +36,7 @@ This helper is still in developpment, main process or methods could change in ne
         // 'app_token' => 'dyNYgfK0Ya6FWGqq83sBHa7TwzWo+pg4fDFUJHShcjVYzTfaRrZzm93p7OTAfH/0',
         'freebox_ip' =>  'http://204.232.175.90'
     ));
-    
+
     /* App Token is automatically stored in Session and reused in each instance for the same $app data.
         After the first instance, you can also get the App Token with the following method :
     */
@@ -45,6 +45,8 @@ This helper is still in developpment, main process or methods could change in ne
 ```
 
 ### Options
+* `use_session` : (default: `true`) Use or not the session _(if don't use it, you must pass the `app_token` parameter yourself whenever you instanciate FreeboxOS)_.
+* `app_token` : When you have it, you can pass it in this parameter.
 * `freebox_ip` : Set your external freebox ip address ( ___mandatory___ if you use it out of your localhost )
 * `monitor_wait` : (default: `5`) Set the time (in seconds) to wait before check again the authorization. Don't put a too high value or it could reach the maximum execution time of your php configuration.
 * `fs` : Array()
@@ -73,5 +75,5 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-        
-          
+
+
